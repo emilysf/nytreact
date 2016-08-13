@@ -213,7 +213,6 @@
 /***/ function(module, exports) {
 
 	// shim for using process in browser
-
 	var process = module.exports = {};
 
 	// cached from whatever global is present so that test runners that stub it
@@ -225,21 +224,63 @@
 	var cachedClearTimeout;
 
 	(function () {
-	  try {
-	    cachedSetTimeout = setTimeout;
-	  } catch (e) {
-	    cachedSetTimeout = function () {
-	      throw new Error('setTimeout is not defined');
+	    try {
+	        cachedSetTimeout = setTimeout;
+	    } catch (e) {
+	        cachedSetTimeout = function () {
+	            throw new Error('setTimeout is not defined');
+	        }
 	    }
-	  }
-	  try {
-	    cachedClearTimeout = clearTimeout;
-	  } catch (e) {
-	    cachedClearTimeout = function () {
-	      throw new Error('clearTimeout is not defined');
+	    try {
+	        cachedClearTimeout = clearTimeout;
+	    } catch (e) {
+	        cachedClearTimeout = function () {
+	            throw new Error('clearTimeout is not defined');
+	        }
 	    }
-	  }
 	} ())
+	function runTimeout(fun) {
+	    if (cachedSetTimeout === setTimeout) {
+	        //normal enviroments in sane situations
+	        return setTimeout(fun, 0);
+	    }
+	    try {
+	        // when when somebody has screwed with setTimeout but no I.E. maddness
+	        return cachedSetTimeout(fun, 0);
+	    } catch(e){
+	        try {
+	            // When we are in I.E. but the script has been evaled so I.E. doesn't trust the global object when called normally
+	            return cachedSetTimeout.call(null, fun, 0);
+	        } catch(e){
+	            // same as above but when it's a version of I.E. that must have the global object for 'this', hopfully our context correct otherwise it will throw a global error
+	            return cachedSetTimeout.call(this, fun, 0);
+	        }
+	    }
+
+
+	}
+	function runClearTimeout(marker) {
+	    if (cachedClearTimeout === clearTimeout) {
+	        //normal enviroments in sane situations
+	        return clearTimeout(marker);
+	    }
+	    try {
+	        // when when somebody has screwed with setTimeout but no I.E. maddness
+	        return cachedClearTimeout(marker);
+	    } catch (e){
+	        try {
+	            // When we are in I.E. but the script has been evaled so I.E. doesn't  trust the global object when called normally
+	            return cachedClearTimeout.call(null, marker);
+	        } catch (e){
+	            // same as above but when it's a version of I.E. that must have the global object for 'this', hopfully our context correct otherwise it will throw a global error.
+	            // Some versions of I.E. have different rules for clearTimeout vs setTimeout
+	            return cachedClearTimeout.call(this, marker);
+	        }
+	    }
+
+
+
+	}
 	var queue = [];
 	var draining = false;
 	var currentQueue;
@@ -264,7 +305,7 @@
 	    if (draining) {
 	        return;
 	    }
-	    var timeout = cachedSetTimeout(cleanUpNextTick);
+	    var timeout = runTimeout(cleanUpNextTick);
 	    draining = true;
 
 	    var len = queue.length;
@@ -281,7 +322,7 @@
 	    }
 	    currentQueue = null;
 	    draining = false;
-	    cachedClearTimeout(timeout);
+	    runClearTimeout(timeout);
 	}
 
 	process.nextTick = function (fun) {
@@ -293,7 +334,7 @@
 	    }
 	    queue.push(new Item(fun, args));
 	    if (queue.length === 1 && !draining) {
-	        cachedSetTimeout(drainQueue, 0);
+	        runTimeout(drainQueue);
 	    }
 	};
 
@@ -19695,18 +19736,17 @@
 
 	'use strict';
 
-	// Include React
 	var React = __webpack_require__(1);
 
 	// Here we include all of the sub-components
-	var Form = __webpack_require__(160);
+	var Search = __webpack_require__(160);
 	var Results = __webpack_require__(161);
-	var History = __webpack_require__(162);
+	var Saved = __webpack_require__(162);
 
 	// Helper Function
 	var helpers = __webpack_require__(163);
 
-	// This is the main component.
+	// This is the main component. 
 	var Main = React.createClass({
 		displayName: 'Main',
 
@@ -19714,65 +19754,49 @@
 		// Here we set a generic state associated with the number of clicks
 		getInitialState: function getInitialState() {
 			return {
-				searchTerm: "",
+				topic: "",
+				startYear: "",
+				endYear: "",
 				results: "",
-				history: [] /*Note how we added in this history state variable*/
+				saved: [] /*Note how we added in this history state variable*/
 			};
 		},
 
 		// This function allows childrens to update the parent.
-		setTerm: function setTerm(term) {
+		setTerm: function setTerm(topic, startYear, endYear) {
 			this.setState({
-				searchTerm: term
+				topic: topic,
+				startYear: startYear,
+				endYear: endYear
 			});
+			// call the function below in the helpers.js file		
+			helpers.runQuery(topic, startYear, endYear).then(function (data) {
+				// set the state of nytdata to all the data returned from the ny times api so we can map through it and display it to the screen below
+				this.setState({
+					results: data
+				});
+
+				// .bind so we have this refering to the object returned
+			}.bind(this));
 		},
 
-		// If the component changes (i.e. if a search is entered)...
-		componentDidUpdate: function componentDidUpdate(prevProps, prevState) {
+		// If the component changes (i.e. if a search is entered)... 
+		// componentDidUpdate: function(){
 
-			if (prevState.searchTerm != this.state.searchTerm) {
-				console.log("UPDATED");
 
-				// Run the query for the address
-				helpers.runQuery(this.state.searchTerm).then(function (data) {
-					if (data != this.state.results) {
-						console.log("Address", data);
+		// }, // end componentDidUpdate()
 
-						this.setState({
-							results: data
-						});
-
-						// Run function to add the record to the db
-						// Lots of nesting going on! (This code could probably be optimized, but it gets the job done.)
-						helpers.postHistory(this.state.searchTerm).then(function (data) {
-							console.log("Updated!");
-
-							// Get the history AFTER we've posted the data.
-							helpers.getHistory().then(function (response) {
-								console.log("Current History", response.data);
-								if (response != this.state.history) {
-									console.log("History", response.data);
-
-									this.setState({
-										history: response.data
-									});
-								}
-							}.bind(this));
-						}.bind(this));
-					}
-				}.bind(this));
-			}
-		},
 
 		// The moment the page renders get the History
 		componentDidMount: function componentDidMount() {
 
+			// Get the latest history.
 			helpers.getHistory().then(function (response) {
-				if (response != this.state.history) {
-					console.log("History", response.data);
+				if (response != this.state.saved) {
+					console.log("Saved", response.data);
 
 					this.setState({
-						history: response.data
+						saved: response.data
 					});
 				}
 			}.bind(this));
@@ -19793,7 +19817,7 @@
 						React.createElement(
 							'h2',
 							{ className: 'text-center' },
-							'Address Finder!'
+							'New York Times Article Scrubber'
 						),
 						React.createElement(
 							'p',
@@ -19801,25 +19825,33 @@
 							React.createElement(
 								'em',
 								null,
-								'Enter a landmark to search for its exact address (ex: "Eiffel Tower").'
+								'Search for and annotate articles of interest!'
 							)
 						)
-					),
-					React.createElement(
-						'div',
-						{ className: 'col-md-6' },
-						React.createElement(Form, { setTerm: this.setTerm })
-					),
-					React.createElement(
-						'div',
-						{ className: 'col-md-6' },
-						React.createElement(Results, { address: this.state.results })
 					)
 				),
 				React.createElement(
 					'div',
 					{ className: 'row' },
-					React.createElement(History, { history: this.state.history })
+					React.createElement(
+						'div',
+						{ className: 'col-md-12' },
+						React.createElement(Search, { setTerm: this.setTerm })
+					)
+				),
+				React.createElement(
+					'div',
+					{ className: 'row' },
+					React.createElement(
+						'div',
+						{ className: 'col-md-12' },
+						React.createElement(Results, { results: this.state.results })
+					)
+				),
+				React.createElement(
+					'div',
+					{ className: 'row' },
+					React.createElement(Saved, { saved: this.state.saved })
 				)
 			);
 		}
@@ -19834,40 +19866,42 @@
 
 	"use strict";
 
-	// Include React
+	// Include React 
 	var React = __webpack_require__(1);
 
-	// This is the form component.
-	var Form = React.createClass({
-		displayName: "Form",
+	// This is the form component. 
+	var Search = React.createClass({
+		displayName: "Search",
 
 
 		// Here we set a generic state associated with the text being searched for
 		getInitialState: function getInitialState() {
 			return {
-				term: ""
+				Topic: "",
+				startYear: "",
+				endYear: ""
 			};
 		},
 
-		// This function will respond to the user input
+		// This function will respond to the user input 
 		handleChange: function handleChange(event) {
 
 			// Here we create syntax to capture any change in text to the query terms (pre-search).
-			// See this Stack Overflow answer for more details:
+			// See this Stack Overflow answer for more details: 
 			// http://stackoverflow.com/questions/21029999/react-js-identifying-different-inputs-with-one-onchange-handler
 			var newState = {};
 			newState[event.target.id] = event.target.value;
 			this.setState(newState);
 		},
 
-		// When a user submits...
+		// When a user submits... 
 		handleClick: function handleClick() {
 
 			console.log("CLICK");
-			console.log(this.state.term);
+			console.log(this.state.Topic);
 
 			// Set the parent to have the search term
-			this.props.setTerm(this.state.term);
+			this.props.setTerm(this.state.Topic);
 		},
 
 		// Here we render the function
@@ -19882,7 +19916,7 @@
 					React.createElement(
 						"h3",
 						{ className: "panel-title text-center" },
-						"Query"
+						"Search"
 					)
 				),
 				React.createElement(
@@ -19900,7 +19934,29 @@
 								React.createElement(
 									"strong",
 									null,
-									"Location"
+									"Topic"
+								)
+							),
+							React.createElement("input", { type: "text", className: "form-control text-center", id: "term", onChange: this.handleChange, required: true }),
+							React.createElement("br", null),
+							React.createElement(
+								"h4",
+								{ className: "" },
+								React.createElement(
+									"strong",
+									null,
+									"Start Year"
+								)
+							),
+							React.createElement("input", { type: "text", className: "form-control text-center", id: "term", onChange: this.handleChange, required: true }),
+							React.createElement("br", null),
+							React.createElement(
+								"h4",
+								{ className: "" },
+								React.createElement(
+									"strong",
+									null,
+									"End Year"
 								)
 							),
 							React.createElement("input", { type: "text", className: "form-control text-center", id: "term", onChange: this.handleChange, required: true }),
@@ -19918,7 +19974,7 @@
 	});
 
 	// Export the component back for use in other files
-	module.exports = Form;
+	module.exports = Search;
 
 /***/ },
 /* 161 */
@@ -19926,45 +19982,36 @@
 
 	"use strict";
 
-	// Include React
+	// Include React 
 	var React = __webpack_require__(1);
 
 	// This is the results component
 	var Results = React.createClass({
 		displayName: "Results",
 
-
 		// Here we render the function
 		render: function render() {
 
 			return React.createElement(
 				"div",
-				{ className: "panel panel-default" },
+				{ className: "col-md-12" },
 				React.createElement(
 					"div",
-					{ className: "panel-heading" },
+					{ className: "panel panel-default" },
 					React.createElement(
-						"h3",
-						{ className: "panel-title text-center" },
-						"Results"
-					)
-				),
-				React.createElement(
-					"div",
-					{ className: "panel-body text-center" },
-					React.createElement(
-						"h1",
-						null,
-						"Address:"
+						"div",
+						{ className: "panel-heading" },
+						React.createElement(
+							"h3",
+							{ className: "panel-title text-center" },
+							"Results"
+						)
 					),
-					React.createElement(
-						"p",
-						null,
-						this.props.address
-					)
+					React.createElement("div", { className: "panel-body" })
 				)
 			);
 		}
+
 	});
 
 	// Export the component back for use in other files
@@ -19976,47 +20023,49 @@
 
 	"use strict";
 
-	// Include React
+	// Include React 
 	var React = __webpack_require__(1);
 
 	// This is the history component. It will be used to show a log of  recent searches.
-	var History = React.createClass({
-		displayName: "History",
+	var Saved = React.createClass({
+		displayName: "Saved",
 
 		// Here we render the function
 		render: function render() {
 
 			return React.createElement(
 				"div",
-				{ className: "panel panel-default" },
+				{ className: "col-md-12" },
 				React.createElement(
 					"div",
-					{ className: "panel-heading" },
+					{ className: "panel panel-default" },
 					React.createElement(
-						"h3",
-						{ className: "panel-title text-center" },
-						"Search History"
+						"div",
+						{ className: "panel-heading" },
+						React.createElement(
+							"h3",
+							{ className: "panel-title text-center" },
+							"Saved Articles"
+						)
+					),
+					React.createElement(
+						"div",
+						{ className: "panel-body text-center" },
+						this.props.saved.map(function (search, i) {
+							return React.createElement(
+								"p",
+								{ key: i },
+								search.title
+							);
+						})
 					)
-				),
-				React.createElement(
-					"div",
-					{ className: "panel-body text-center" },
-					this.props.history.map(function (search, i) {
-						return React.createElement(
-							"p",
-							{ key: i },
-							search.location,
-							" - ",
-							search.date
-						);
-					})
 				)
 			);
 		}
 	});
 
 	// Export the component back for use in other files
-	module.exports = History;
+	module.exports = Saved;
 
 /***/ },
 /* 163 */
@@ -20027,29 +20076,28 @@
 	// Include the axios package for performing HTTP requests (promise based alternative to request)
 	var axios = __webpack_require__(164);
 
-	// Geocoder API
-	var geocodeAPI = "35e5548c618555b1a43eb4759d26b260";
+	// New York Times API
+	var keyAPI = "c0cadd8423d34c049b22a559dcce9f56";
 
 	// Helper Functions (in this case the only one is runQuery)
 	var helpers = {
 
-		// This function serves our purpose of running the query to geolocate.
-		runQuery: function runQuery(location) {
+		// This function serves our purpose of running the query of articles. 
+		runQuery: function runQuery(topic, startYear, endYear) {
 
-			console.log(location);
+			console.log(topic, startYear, endYear);
 
-			//Figure out the geolocation
-			var queryURL = "http://api.opencagedata.com/geocode/v1/json?query=" + location + "&pretty=1&key=" + geocodeAPI;
+			var queryURL = "http://api.nytimes.com/svc/search/v2/articlesearch.json?api-key=" + keyAPI + "&q=" + topic + "&begin_date" + startYear + "&end_date" + endYear;
 
 			return axios.get(queryURL).then(function (response) {
 
 				console.log(response);
-				return response.data.results[0].formatted;
+				return response.data.response.docs;
 			});
 		},
 
 		// This function hits our own server to retrieve the record of query results
-		getHistory: function getHistory() {
+		getArticles: function getArticles() {
 
 			return axios.get('/api').then(function (response) {
 
@@ -20059,18 +20107,34 @@
 		},
 
 		// This function posts new searches to our database.
-		postHistory: function postHistory(location) {
+		postArticles: function postArticles(articles) {
 
-			return axios.post('/api', { location: location }).then(function (results) {
+			return axios.post('/api/saved', {
+				title: this.main.headline,
+				date: this.pub_date,
+				url: this.web_url
+			});
 
-				console.log("Posted to MongoDB");
+			// return axios.post('/api', articles)
+			// 	.then(function(results){
+
+			// 		console.log("Posted to MongoDB");
+			// 		return(results);
+			// 	})
+		},
+
+		// This function deletes the articles from the database.
+		deleteArticles: function deleteArticles(articles) {
+
+			return axios.post('/api/saved', { title: this.title }).then(function (results) {
+
 				return results;
 			});
 		}
 
 	};
 
-	// We export the helpers function
+	// We export the helpers function 
 	module.exports = helpers;
 
 /***/ },

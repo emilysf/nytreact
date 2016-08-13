@@ -6,7 +6,7 @@ var mongojs = require('mongojs');
 
 // Create Instance of Express
 var app = express();
-var PORT = process.env.PORT || 3000; // Sets an initial port. We'll use this later in our listener
+var PORT = process.env.PORT || 3001; // Sets an initial port. We'll use this later in our listener
 
 // Run Morgan for Logging
 app.use(logger('dev'));
@@ -20,7 +20,7 @@ app.use(express.static('./public'));
 // -------------------------------------------------
 
 // MongoDB Configuration configuration (Change this URL to your own DB)
-var databaseUrl = 'mongodb://heroku_n185whst:26c1vdeevrutljhjgfo82tujd2@ds153705.mlab.com:53705/heroku_n185whst';
+var databaseUrl = 'mongodb://heroku_n185whst:26c1vdeevrutljhjgfo82tujd2@ds153705.mlab.com:53705/heroku_n185whst'; //nytdb
 var collections = ["articles"];
 
 // use mongojs to hook the database to the db variable 
@@ -56,14 +56,13 @@ app.get('/api/', function(req, res) {
 app.post('/api/saved', function(req, res){
   console.log("BODY: " + req.body.headline);
 
-  // Here we'll save the location based on the JSON input. 
   // We'll use Date.now() to always get the current date time
   db.articles.insert({"title": this.main.headline, "date": this.pub_date, url: this.web_url}, function(err){
     if(err){
       console.log(err);
     }
     else {
-      res.send("Saved Article");
+      res.send("Article Saved");
     }
   })
 });
