@@ -36,20 +36,26 @@ var helpers = {
 	},
 
 	// This function posts new searches to our database.
-	postArticles: function(postArticles){
+	postArticles: function(articles){
 
-		return axios.post('/api', postArticles)
-			.then(function(results){
+		return axios.post('/api/saved', {
+			title: this.main.headline,
+			date: this.pub_date, 
+			url: this.web_url
+		})
 
-				console.log("Posted to MongoDB");
-				return(results);
-			})
+		// return axios.post('/api', articles)
+		// 	.then(function(results){
+
+		// 		console.log("Posted to MongoDB");
+		// 		return(results);
+		// 	})
 	},
 
 	// This function deletes the articles from the database.
-	deleteArticles: function(article_id){
+	deleteArticles: function(articles){
 
-		return axios.post('/api/delete', article_id)
+		return axios.post('/api/saved', {title: this.title})
 			.then(function(results){
 
 				return(results);
