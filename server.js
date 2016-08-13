@@ -20,7 +20,7 @@ app.use(express.static('./public'));
 // -------------------------------------------------
 
 // MongoDB Configuration configuration (Change this URL to your own DB)
-var databaseUrl = 'nytdb';
+var databaseUrl = 'mongodb://heroku_n185whst:26c1vdeevrutljhjgfo82tujd2@ds153705.mlab.com:53705/heroku_n185whst';
 var collections = ["articles"];
 
 // use mongojs to hook the database to the db variable 
@@ -43,32 +43,46 @@ app.get('/', function(req, res){
 app.get('/api/', function(req, res) {
 
   // We will find all the records, sort it in descending order, then limit the records to 5
-  db.articles.find({}).sort([['date', 'descending']]).limit(5, function(err, doc){
 
-      if(err){
-        console.log(err);
-      }
-      else {
-        res.send(doc);
-      }
-    })
+   db.articles.find({}).sort({pub_date: -1}, function(err, docs) {
+
+    if (err) throw err;
+
+    res.send(docs);
+
+  });
 });
 
-// This is the route we will send POST requests to save each search.
-app.post('/api/', function(req, res){
-  console.log("BODY: " + req.body.location);
+app.post('/api/saved', function(req, res){
+  console.log("BODY: " + req.body.headline);
 
   // Here we'll save the location based on the JSON input. 
   // We'll use Date.now() to always get the current date time
-  db.aticles.insert({"location": req.body.location, "date": Date.now()}, function(err){
+  db.articles.insert({"title": this.main.headline, "date": this.pub_date, url: this.web_url}, function(err){
     if(err){
       console.log(err);
     }
     else {
-      res.send("Saved Search");
+      res.send("Saved Article");
     }
   })
 });
+
+app.delete('/api/saved', function(req, res){
+  console.log("BODY: " + req.body.location);
+
+  // Here we'll save the location based on the JSON input. 
+  // We'll use Date.now() to always get the current date time
+  db.articles.remove({"title": this.main.headline, function(err){
+    if(err){
+      console.log(err);
+    }
+    else {
+      res.send("Removed Saved Article");
+    }
+  }
+  });
+ });
 
 
 // -------------------------------------------------
